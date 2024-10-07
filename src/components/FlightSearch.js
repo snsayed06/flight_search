@@ -336,6 +336,7 @@ const FlightSearch = () => {
           <button
             onClick={() => toggleDropdown('class')}
             className="bg-gray-700 px-4 py-2 rounded-md flex items-center justify-between w-36"
+            style={{ width: '200px', whiteSpace: 'nowrap' }}
           >
             <span>{flightClass}</span>
             <svg
@@ -366,6 +367,7 @@ const FlightSearch = () => {
                 className={`p-2 cursor-pointer ${
                   flightClass === 'Premium economy' ? 'bg-gray-600' : ''
                 }`}
+                style={{ whiteSpace: 'nowrap' }}
               >
                 Premium economy
               </li>
@@ -423,10 +425,10 @@ const FlightSearch = () => {
             inputProps={inputPropsTo} // Pass inputProps with className
           />
         </div>
-      </div>
+      {/* </div> */}
 
       {/* Date Pickers */}
-      <div className="flex space-x-4 mt-4">
+      {/* <div className="flex space-x-4 mt-4 items-center"> */}
         {/* Departure Date */}
         <div className="flex-1">
           <label className="block text-sm mb-2">Departure</label>
@@ -439,18 +441,21 @@ const FlightSearch = () => {
           />
         </div>
 
-        {/* Return Date */}
-        <div className="flex-1">
-          <label className="block text-sm mb-2">Return</label>
-          <input
-            type="date"
-            value={returnDate}
-            onChange={(e) => setReturnDate(e.target.value)}
-            min={departureDate} // Ensure return date is after departure date
-            className="w-full p-2 bg-gray-900 text-white rounded-md focus:outline-none"
-          />
-        </div>
+        {/* Conditionally render Return Date */}
+        {tripType !== 'One way' && tripType !== 'Multi-city' && (
+          <div className="flex-1">
+            <label className="block text-sm mb-2">Return</label>
+            <input
+              type="date"
+              value={returnDate}
+              onChange={(e) => setReturnDate(e.target.value)}
+              min={departureDate} // Ensure return date is after departure date
+              className="w-full p-2 bg-gray-900 text-white rounded-md focus:outline-none"
+            />
+          </div>
+        )}
       </div>
+      
 
       {/* CTA Button */}
       <div className="mt-6">

@@ -12,8 +12,41 @@ const FlightSearch = () => {
   const [departureDate, setDepartureDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
 
+  const [flightSegments, setFlightSegments] = useState([
+    { fromLocation: '', toLocation: '', departureDate: '' }
+  ]);
+
+  // Render the floating suggestion box
+  const renderSuggestionsContainer = ({ containerProps, children }, type) => {
+    // Get input's bounding box for proper positioning
+    const inputBoundingBox =
+      type === 'from'
+        ? fromInputRef.current?.getBoundingClientRect() || { left: 0, top: 0, width: 0 }
+        : toInputRef.current?.getBoundingClientRect() || { left: 0, top: 0, width: 0 };
+
+    return (
+      <div
+        {...containerProps}
+        className="absolute bg-gray-700 text-white z-50 shadow-lg"
+        style={{
+          position: 'absolute',
+          top: `${inputBoundingBox.top + inputBoundingBox.height}px`,
+          left: `${inputBoundingBox.left}px`,
+          width: `${inputBoundingBox.width}px`,
+          maxHeight: '200px',
+          overflowY: 'scroll', // Enable scrolling when suggestions exceed the height
+        }}
+      >
+        {children}
+      </div>
+    );
+  };
+  
+
   const [suggestions, setSuggestions] = useState([]); // State for storing suggestions
   const [submittedData, setSubmittedData] = useState(null); // For displaying submitted form data
+  const fromInputRef = useRef(null); // Separate ref for "From" input
+  const toInputRef = useRef(null);   // Separate ref for "To" input
 
   // State for passenger counts
   const [adults, setAdults] = useState(1);
@@ -31,26 +64,27 @@ const FlightSearch = () => {
   // Filtering airports based on user input (showing top 5 results)
   const getSuggestions = (value) => {
     if (!value) return [];
-
     const inputValue = value.trim().toLowerCase();
     const inputLength = inputValue.length;
-
-    console.log('Fetching suggestions for:', value); // Debugging log for input value
-
-    // Access the 'airports' array inside the main object
-    const airportList = airports.airports; // Access the correct array of airports
-
-    return inputLength === 0
-      ? []
-      : airportList
-          .filter(
-            (airport) =>
-              (airport.iata && airport.iata.toLowerCase().startsWith(inputValue)) || // Improved IATA search using 'startsWith'
-              (airport.name && airport.name.toLowerCase().includes(inputValue)) || // Keep partial match for airport name
-              (airport.city && airport.city.toLowerCase().includes(inputValue))    // Keep partial match for city name
-          )
-          .slice(0, 5); // Limit to top 5 results
+    if (inputLength === 0) return [];
+    const airportList = airports.airports;
+    const partialMatchRegex = new RegExp(inputValue, 'i');
+    return airportList
+      .filter((airport) => {
+        const { iata, name, city } = airport;
+        const iataCode = iata ? iata.toUpperCase() : '';
+        const airportName = name ? name.toLowerCase() : '';
+        const cityName = city ? city.toLowerCase() : '';
+        const isIataMatch = iataCode.startsWith(inputValue);
+        const isExactNameMatch = airportName === inputValue;
+        const isExactCityMatch = cityName === inputValue;
+        const isPartialNameMatch = partialMatchRegex.test(airportName);
+        const isPartialCityMatch = partialMatchRegex.test(cityName);
+        return isIataMatch || isExactNameMatch || isExactCityMatch || isPartialNameMatch || isPartialCityMatch;
+      })
+      .slice(0, 5);
   };
+  
 
   // Autosuggest will call this function every time user types
   const onSuggestionsFetchRequested = ({ value }) => {
@@ -61,8 +95,7 @@ const FlightSearch = () => {
   };
 
   // When user selects a suggestion
-  const onSuggestionSelected = (event, { suggestion, method }, type) => {
-    console.log('Selected suggestion:', suggestion); // Debugging log for selected suggestion
+  const onSuggestionSelected = (event, { suggestion }, type) => {
     if (type === 'from') {
       setFromLocation(`${suggestion.iata} - ${suggestion.name}`);
     } else {
@@ -81,6 +114,7 @@ const FlightSearch = () => {
     value: fromLocation,
     onChange: (event, { newValue }) => setFromLocation(newValue),
     className: 'w-full p-2 bg-gray-900 text-white rounded-md focus:outline-none',
+    ref: fromInputRef, // Attach inputRef to the input element
   };
 
   // Input props for the "To" field
@@ -89,14 +123,16 @@ const FlightSearch = () => {
     value: toLocation,
     onChange: (event, { newValue }) => setToLocation(newValue),
     className: 'w-full p-2 bg-gray-900 text-white rounded-md focus:outline-none',
+    ref: toInputRef, // Attach inputRef to the input element
   };
 
   // Render the suggestion
   const renderSuggestion = (suggestion) => (
-    <div>
+    <div className="p-2 hover:bg-gray-600">
       {suggestion.iata} - {suggestion.name} ({suggestion.city}, {suggestion.country})
     </div>
   );
+
 
   // Function to switch "From" and "To" locations
   const switchLocations = () => {
@@ -149,6 +185,26 @@ const FlightSearch = () => {
   // Get today's date in YYYY-MM-DD format
   const today = new Date().toISOString().split('T')[0];
 
+    // Function to add a new flight segment for Multi-city
+  const addFlightSegment = () => {
+    setFlightSegments([...flightSegments, { fromLocation: '', toLocation: '', departureDate: '' }]);
+  };
+  
+  // Function to remove a flight segment
+  const removeFlightSegment = (index) => {
+    const updatedSegments = flightSegments.filter((_, i) => i !== index);
+    setFlightSegments(updatedSegments);
+  };
+  
+    // Input handlers for the flight segments
+  const handleInputChange = (index, field, value) => {
+    const updatedSegments = flightSegments.map((segment, i) =>
+      i === index ? { ...segment, [field]: value } : segment
+    );
+    setFlightSegments(updatedSegments);
+  };
+  
+
   // Function to handle form submission and display data
   const handleSubmit = () => {
     const formData = {
@@ -168,6 +224,8 @@ const FlightSearch = () => {
 
     setSubmittedData(formData); // Set the form data for display
   };
+
+
 
   return (
     <div className="bg-gray-800 text-white p-6 rounded-lg shadow-md max-w-4xl mx-auto">
@@ -387,75 +445,148 @@ const FlightSearch = () => {
           )}
         </div>
       </div>
+      
 
       {/* Flight Search Fields with Switch Button */}
-      <div className="flex space-x-4 mt-4 items-center">
-        {/* Departure Input */}
-        <div className="flex-1">
-          <label className="block text-sm mb-2">From</label>
-          <Autosuggest
-            suggestions={suggestions}
-            onSuggestionsFetchRequested={onSuggestionsFetchRequested} // Update suggestions on input
-            onSuggestionsClearRequested={onSuggestionsClearRequested} // Clear suggestions when input is empty
-            onSuggestionSelected={(event, data) => onSuggestionSelected(event, data, 'from')}
-            getSuggestionValue={(suggestion) => suggestion.iata}
-            renderSuggestion={renderSuggestion}
-            inputProps={inputPropsFrom} // Pass inputProps with className
-          />
-        </div>
-
-        {/* Switch Button */}
-        <button
-          onClick={switchLocations}
-          className="bg-gray-700 px-2 py-1 rounded-full text-white transform hover:rotate-180 transition duration-300"
-        >
-          ⟲
-        </button>
-
-        {/* Destination Input */}
-        <div className="flex-1">
-          <label className="block text-sm mb-2">To</label>
-          <Autosuggest
-            suggestions={suggestions}
-            onSuggestionsFetchRequested={onSuggestionsFetchRequested} // Update suggestions on input
-            onSuggestionsClearRequested={onSuggestionsClearRequested} // Clear suggestions when input is empty
-            onSuggestionSelected={(event, data) => onSuggestionSelected(event, data, 'to')}
-            getSuggestionValue={(suggestion) => suggestion.iata}
-            renderSuggestion={renderSuggestion}
-            inputProps={inputPropsTo} // Pass inputProps with className
-          />
-        </div>
-      {/* </div> */}
-
-      {/* Date Pickers */}
-      {/* <div className="flex space-x-4 mt-4 items-center"> */}
-        {/* Departure Date */}
-        <div className="flex-1">
-          <label className="block text-sm mb-2">Departure</label>
-          <input
-            type="date"
-            value={departureDate}
-            onChange={(e) => setDepartureDate(e.target.value)}
-            min={today} // Restrict past dates
-            className="w-full p-2 bg-gray-900 text-white rounded-md focus:outline-none"
-          />
-        </div>
-
-        {/* Conditionally render Return Date */}
-        {tripType !== 'One way' && tripType !== 'Multi-city' && (
+      {tripType !== 'Multi-city' && (
+        <div className="flex space-x-4 mt-4 items-center">
+          {/* Departure Input */}
           <div className="flex-1">
-            <label className="block text-sm mb-2">Return</label>
+            <label className="block text-sm mb-2">From</label>
+            <Autosuggest
+              suggestions={suggestions}
+              onSuggestionsFetchRequested={onSuggestionsFetchRequested} // Update suggestions on input
+              onSuggestionsClearRequested={onSuggestionsClearRequested} // Clear suggestions when input is empty
+              onSuggestionSelected={(event, data) => onSuggestionSelected(event, data, 'from')}
+              getSuggestionValue={(suggestion) => suggestion.iata}
+              renderSuggestion={renderSuggestion}
+              renderSuggestionsContainer={(props) => renderSuggestionsContainer(props, 'from')}
+              inputProps={inputPropsFrom} // Pass inputProps with className
+            />
+          </div>
+
+          {/* Switch Button */}
+          <button
+            onClick={switchLocations}
+            className="bg-gray-700 px-2 py-1 rounded-full text-white transform hover:rotate-180 transition duration-300"
+          >
+            ⟲
+          </button>
+
+          {/* Destination Input */}
+          <div className="flex-1">
+            <label className="block text-sm mb-2">To</label>
+            <Autosuggest
+              suggestions={suggestions}
+              onSuggestionsFetchRequested={onSuggestionsFetchRequested} // Update suggestions on input
+              onSuggestionsClearRequested={onSuggestionsClearRequested} // Clear suggestions when input is empty
+              onSuggestionSelected={(event, data) => onSuggestionSelected(event, data, 'to')}
+              getSuggestionValue={(suggestion) => suggestion.iata}
+              renderSuggestion={renderSuggestion}
+              renderSuggestionsContainer={(props) => renderSuggestionsContainer(props, 'to')} // Pass the custom scrollable container
+              inputProps={inputPropsTo} // Pass inputProps with className
+            />
+          </div>
+          {/* </div> */}
+
+          {/* Date Pickers */}
+          {/* <div className="flex space-x-4 mt-4 items-center"> */}
+          {/* Departure Date */}
+          <div className="flex-1">
+            <label className="block text-sm mb-2">Departure</label>
             <input
               type="date"
-              value={returnDate}
-              onChange={(e) => setReturnDate(e.target.value)}
-              min={departureDate} // Ensure return date is after departure date
+              value={departureDate}
+              onChange={(e) => setDepartureDate(e.target.value)}
+              min={today} // Restrict past dates
               className="w-full p-2 bg-gray-900 text-white rounded-md focus:outline-none"
             />
           </div>
-        )}
-      </div>
+
+          {/* Conditionally render Return Date */}
+          {tripType !== 'One way' && tripType !== 'Multi-city' && (
+            <div className="flex-1">
+              <label className="block text-sm mb-2">Return</label>
+              <input
+                type="date"
+                value={returnDate}
+                onChange={(e) => setReturnDate(e.target.value)}
+                min={departureDate} // Ensure return date is after departure date
+                className="w-full p-2 bg-gray-900 text-white rounded-md focus:outline-none"
+              />
+            </div>
+          )}
+        </div>
+      )}
       
+
+    {/* Multi-city Flight Segments */}
+    {tripType === 'Multi-city' && (
+        <div>
+          {flightSegments.map((segment, index) => (
+            <div key={index} className="flex space-x-4 mt-4 items-center">
+              {/* From Location */}
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="From (e.g., LAX)"
+                  value={segment.fromLocation}
+                  onChange={(e) => handleInputChange(index, 'fromLocation', e.target.value)}
+                  className="w-full p-2 bg-gray-900 text-white rounded-md"
+                />
+              </div>
+
+              {/* Switch Button */}
+              <button
+                onClick={switchLocations}
+                className="bg-gray-700 px-2 py-1 rounded-full text-white transform hover:rotate-180 transition duration-300"
+              >
+                ⟲
+              </button>
+
+              {/* To Location */}
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="To (e.g., JFK)"
+                  value={segment.toLocation}
+                  onChange={(e) => handleInputChange(index, 'toLocation', e.target.value)}
+                  className="w-full p-2 bg-gray-900 text-white rounded-md"
+                />
+              </div>
+
+              {/* Departure Date */}
+              <div className="flex-1">
+                <input
+                  type="date"
+                  value={segment.departureDate}
+                  onChange={(e) => handleInputChange(index, 'departureDate', e.target.value)}
+                  min={today}
+                  className="w-full p-2 bg-gray-900 text-white rounded-md"
+                />
+              </div>
+
+              {/* Remove Flight Button */}
+              {index > 0 && (
+                <button
+                  className="bg-red-500 text-white p-2 rounded-md"
+                  onClick={() => removeFlightSegment(index)}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          ))}
+
+          {/* Add Flight Button */}
+          <button
+            onClick={addFlightSegment}
+            className="mt-4 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md"
+          >
+            Add flight
+          </button>
+        </div>
+      )}  
 
       {/* CTA Button */}
       <div className="mt-6">

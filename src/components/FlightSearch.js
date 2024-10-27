@@ -12,9 +12,27 @@ const FlightSearch = () => {
   const [departureDate, setDepartureDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
 
+  // Get today's date in YYYY-MM-DD format
+  const today = new Date().toISOString().split('T')[0];
+
   const [flightSegments, setFlightSegments] = useState([
     { fromLocation: '', toLocation: '', departureDate: '' }
   ]);
+
+  const [suggestions, setSuggestions] = useState([]); // State for storing suggestions
+  const [submittedData, setSubmittedData] = useState(null); // For displaying submitted form data
+
+    // State for passenger counts
+    const [adults, setAdults] = useState(1);
+    const [children, setChildren] = useState(0);
+    const [infantsSeat, setInfantsSeat] = useState(0);
+    const [infantsLap, setInfantsLap] = useState(0);
+  
+    // References to the dropdown containers
+    const dropdownRef = useRef(null);
+
+    const fromInputRef = useRef(null); // Separate ref for "From" input
+    const toInputRef = useRef(null);   // Separate ref for "To" input
 
   // Render the floating suggestion box
   const renderSuggestionsContainer = ({ containerProps, children }, type) => {
@@ -41,21 +59,6 @@ const FlightSearch = () => {
       </div>
     );
   };
-  
-
-  const [suggestions, setSuggestions] = useState([]); // State for storing suggestions
-  const [submittedData, setSubmittedData] = useState(null); // For displaying submitted form data
-  const fromInputRef = useRef(null); // Separate ref for "From" input
-  const toInputRef = useRef(null);   // Separate ref for "To" input
-
-  // State for passenger counts
-  const [adults, setAdults] = useState(1);
-  const [children, setChildren] = useState(0);
-  const [infantsSeat, setInfantsSeat] = useState(0);
-  const [infantsLap, setInfantsLap] = useState(0);
-
-  // References to the dropdown containers
-  const dropdownRef = useRef(null);
 
   useEffect(() => {
     console.log('Airports data:', airports); // Log the structure of airports-json
@@ -84,7 +87,6 @@ const FlightSearch = () => {
       })
       .slice(0, 5);
   };
-  
 
   // Autosuggest will call this function every time user types
   const onSuggestionsFetchRequested = ({ value }) => {
@@ -108,31 +110,12 @@ const FlightSearch = () => {
     setSuggestions([]); // Clear suggestions
   };
 
-  // Input props for the "From" field
-  const inputPropsFrom = {
-    placeholder: 'From (e.g., LAX, JFK)',
-    value: fromLocation,
-    onChange: (event, { newValue }) => setFromLocation(newValue),
-    className: 'w-full p-2 bg-gray-900 text-white rounded-md focus:outline-none',
-    ref: fromInputRef, // Attach inputRef to the input element
-  };
-
-  // Input props for the "To" field
-  const inputPropsTo = {
-    placeholder: 'To (e.g., LAX, JFK)',
-    value: toLocation,
-    onChange: (event, { newValue }) => setToLocation(newValue),
-    className: 'w-full p-2 bg-gray-900 text-white rounded-md focus:outline-none',
-    ref: toInputRef, // Attach inputRef to the input element
-  };
-
   // Render the suggestion
   const renderSuggestion = (suggestion) => (
     <div className="p-2 hover:bg-gray-600">
       {suggestion.iata} - {suggestion.name} ({suggestion.city}, {suggestion.country})
     </div>
   );
-
 
   // Function to switch "From" and "To" locations
   const switchLocations = () => {
@@ -165,27 +148,7 @@ const FlightSearch = () => {
     setDropdownOpen(null); // Close the dropdown
   };
 
-  // Handle clicks outside the dropdown to close it
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setDropdownOpen(null); // Close dropdown if clicked outside
-      }
-    };
-
-    // Add event listener to detect outside clicks
-    document.addEventListener('mousedown', handleClickOutside);
-
-    // Cleanup the event listener on component unmount
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [dropdownRef]);
-
-  // Get today's date in YYYY-MM-DD format
-  const today = new Date().toISOString().split('T')[0];
-
-    // Function to add a new flight segment for Multi-city
+  // Function to add a new flight segment for Multi-city
   const addFlightSegment = () => {
     setFlightSegments([...flightSegments, { fromLocation: '', toLocation: '', departureDate: '' }]);
   };
@@ -196,14 +159,13 @@ const FlightSearch = () => {
     setFlightSegments(updatedSegments);
   };
   
-    // Input handlers for the flight segments
+  // Input handlers for the flight segments
   const handleInputChange = (index, field, value) => {
     const updatedSegments = flightSegments.map((segment, i) =>
       i === index ? { ...segment, [field]: value } : segment
     );
     setFlightSegments(updatedSegments);
   };
-  
 
   // Function to handle form submission and display data
   const handleSubmit = () => {
@@ -225,7 +187,43 @@ const FlightSearch = () => {
     setSubmittedData(formData); // Set the form data for display
   };
 
+  // Input props for the "From" field
+  const inputPropsFrom = {
+    placeholder: 'From (e.g., LAX, JFK)',
+    value: fromLocation,
+    onChange: (event, { newValue }) => setFromLocation(newValue),
+    className: 'w-full p-2 bg-gray-900 text-white rounded-md focus:outline-none',
+    ref: fromInputRef, // Attach inputRef to the input element
+  };
 
+  // Input props for the "To" field
+  const inputPropsTo = {
+    placeholder: 'To (e.g., LAX, JFK)',
+    value: toLocation,
+    onChange: (event, { newValue }) => setToLocation(newValue),
+    className: 'w-full p-2 bg-gray-900 text-white rounded-md focus:outline-none',
+    ref: toInputRef, // Attach inputRef to the input element
+  };
+
+  // Handle clicks outside the dropdown to close it
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(null); // Close dropdown if clicked outside
+      }
+    };
+
+    // Add event listener to detect outside clicks
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup the event listener on component unmount
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [dropdownRef]);
+
+
+  
 
   return (
     <div className="bg-gray-800 text-white p-6 rounded-lg shadow-md max-w-4xl mx-auto">
